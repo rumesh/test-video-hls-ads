@@ -5,9 +5,10 @@ import type { AppState, DevelopmentOptions } from '@dailymotion/ad-sdk-web';
 
 interface VideoPlayerProps {
   src: string;
+  useFakeAd: boolean;
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ src }) => {
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     let adSdkInitialized = false
@@ -15,7 +16,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src }) => {
     const adSDK = new AdSdkWeb();
 
     useEffect(() => {
-
         const initAdSdk = async (): Promise<void> => {
             const container = containerRef.current;
             const videoTag = videoRef.current;
@@ -128,7 +128,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src }) => {
             }
 
             const developmentOptions: DevelopmentOptions = {
-                useFakeAd: true
+                useFakeAd: useFakeAd
             }
 
             await adSDK.loadAdsSequence(appState, developmentOptions);
@@ -158,7 +158,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src }) => {
         //         });
         //     });
         // }
-    }, [src]);
+    }, [src, useFakeAd]);
 
   return (
     <div

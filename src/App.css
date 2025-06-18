@@ -53,6 +53,23 @@ h1 {
   color: #333;
 }
 
+.controls {
+  margin-bottom: 1rem;
+}
+
+.controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.controls input[type="checkbox"] {
+  width: 1.2rem;
+  height: 1.2rem;
+  cursor: pointer;
+}
+
 .videoPlayerContainer {
   position: relative;
   width: auto;
