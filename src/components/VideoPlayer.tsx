@@ -4,8 +4,69 @@ import { AdSdkWeb } from '@dailymotion/ad-sdk-web';
 import type { AppState, DevelopmentOptions } from '@dailymotion/ad-sdk-web';
 
 interface VideoPlayerProps {
-  src: string;
-  useFakeAd: boolean;
+    src: string;
+    useFakeAd: boolean;
+}
+
+type ConsentObject = {
+    tcfConsent: string;
+    isEnabledForTcf: boolean;
+    tcf2HasConsentForGoogle: boolean;
+    tcf2HasConsentForDailymotion: boolean;
+    isGdprApplicable: boolean;
+}
+
+const DAILYMOTION_VENDOR_ID = 573;
+const GOOGLE_VENDOR_ID = 755;
+
+const defaultConsent: ConsentObject = {
+    tcfConsent: '',
+    isEnabledForTcf: false,
+    tcf2HasConsentForGoogle: false,
+    tcf2HasConsentForDailymotion: false,
+    isGdprApplicable: false,
+}
+
+declare function __tcfapi(
+    command: string,
+    version: number,
+    callback: (tcData: TcData, success: boolean) => void
+): void;
+
+type TcData = {
+    tcString?: string; // The TCF consent string
+    purpose?: {
+        consents?: {
+        [key: number]: boolean; // Purpose consents, indexed by purpose ID
+        };
+    };
+    vendor?: {
+        consents?: {
+        [key: number]: boolean; // Vendor consents, indexed by vendor ID
+        };
+    };
+    gdprApplies?: boolean; // Indicates if GDPR applies
+};
+
+function getConsentFromTcfApi(): Promise<ConsentObject> {
+    return new Promise((resolve) => {
+        if (typeof __tcfapi !== 'function') {
+            return resolve(defaultConsent);
+        }
+        __tcfapi('getTCData', 2, function(tcData: TcData, success: boolean) {
+            if (success && tcData && tcData.vendor && tcData.vendor.consents) {
+                resolve({
+                    tcfConsent: tcData.tcString || '',
+                    isEnabledForTcf: tcData?.purpose?.consents && tcData.purpose.consents[1] || false,
+                    tcf2HasConsentForGoogle: !!tcData.vendor.consents[GOOGLE_VENDOR_ID],
+                    tcf2HasConsentForDailymotion: !!tcData.vendor.consents[DAILYMOTION_VENDOR_ID],
+                    isGdprApplicable: tcData.gdprApplies || false,
+                });
+            } else {
+                resolve(defaultConsent);
+            }
+        });
+    });
 }
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd }) => {
@@ -35,8 +96,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd }) => {
 
             if (!container || !videoTag) return;
 
-            videoTag.removeEventListener('play', loadAdsSequence);
             videoTag.pause();
+            videoTag.removeEventListener('play', loadAdsSequence);
 
             let adPosition: string | null = null;
 
@@ -91,15 +152,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd }) => {
             adSDK.on(adSDK.Events.AD_PLAY, onAdPlay);
             adSDK.on(adSDK.Events.AD_PAUSE, onAdPause);
 
+            const consent:ConsentObject = await getConsentFromTcfApi();
             const appState: AppState = {
-                consent: {
-                    ccpaConsent: '',
-                    tcfConsent: '',
-                    isEnabledForTcf: false,
-                    tcf2HasConsentForGoogle: false,
-                    tcf2HasConsentForDailymotion: false,
-                    isGdprApplicable: false,
-                },
+                consent: consent,
                 video: {
                     id: 'x123',
                     isAutoplay: false,
@@ -108,6 +163,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd }) => {
                     isSeekable: false,
                     viewId: '',
                     duration: 62,
+                    publisherId: '',
+                    publisherType: 'player',
+                    publisherReference: 'x1alda',
                 },
                 environment: {
                     appName: '',
@@ -118,18 +176,18 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd }) => {
                     deviceId: '',
                     trafficSegment: 0,
                     v1st: '',
+                    is3rdPartyCookiesAvailable: false,
                 },
                 player: {
                     videoTag: videoTag,
                     isPlayerControlsEnabled: false,
-                    is3rdPartyCookiesAvailable: false,
                     playedVideosCounter: 0,
                 },
             }
 
-            const developmentOptions: DevelopmentOptions = {
-                useFakeAd: useFakeAd
-            }
+            const developmentOptions: DevelopmentOptions = useFakeAd ? {
+                useFakeAd
+            } : {}
 
             await adSDK.loadAdsSequence(appState, developmentOptions);
             console.log('Ad SDK initialized');
