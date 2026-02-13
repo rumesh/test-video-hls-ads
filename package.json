@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@dailymotion/ad-sdk-web": "^0.0.16",
+    "@dailymotion/ad-sdk-web": "^1.0.2",
     "hls.js": "^1.6.5",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

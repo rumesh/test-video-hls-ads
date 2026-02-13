@@ -10,7 +10,6 @@ interface VideoPlayerProps {
 
 type ConsentObject = {
     tcfConsent: string;
-    isEnabledForTcf: boolean;
     tcf2HasConsentForGoogle: boolean;
     tcf2HasConsentForDailymotion: boolean;
     isGdprApplicable: boolean;
@@ -21,7 +20,6 @@ const GOOGLE_VENDOR_ID = 755;
 
 const defaultConsent: ConsentObject = {
     tcfConsent: '',
-    isEnabledForTcf: false,
     tcf2HasConsentForGoogle: false,
     tcf2HasConsentForDailymotion: false,
     isGdprApplicable: false,
@@ -57,7 +55,6 @@ function getConsentFromTcfApi(): Promise<ConsentObject> {
             if (success && tcData && tcData.vendor && tcData.vendor.consents) {
                 resolve({
                     tcfConsent: tcData.tcString || '',
-                    isEnabledForTcf: tcData?.purpose?.consents && tcData.purpose.consents[1] || false,
                     tcf2HasConsentForGoogle: !!tcData.vendor.consents[GOOGLE_VENDOR_ID],
                     tcf2HasConsentForDailymotion: !!tcData.vendor.consents[DAILYMOTION_VENDOR_ID],
                     isGdprApplicable: tcData.gdprApplies || false,
@@ -72,43 +69,39 @@ function getConsentFromTcfApi(): Promise<ConsentObject> {
 const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    let adSdkInitialized = false
-
-    const adSDK = new AdSdkWeb();
+    const adSdkInitializedRef = useRef(false);
+    const adsLoadedRef = useRef(false);
+    const adSDKRef = useRef(new AdSdkWeb());
 
     useEffect(() => {
-        const initAdSdk = async (): Promise<void> => {
+        const adSDK = adSDKRef.current;
+        let adPosition: string | null = null;
+
+        const initializeAndLoadAds = async (): Promise<void> => {
             const container = containerRef.current;
             const videoTag = videoRef.current;
 
-            if(!container || !videoTag || adSdkInitialized ) { return }
+            if (!container || !videoTag || adSdkInitializedRef.current) { return }
 
-            adSdkInitialized = true;
+            adSdkInitializedRef.current = true;
+
+            // Initialize the ad SDK
             await adSDK.initialize(container);
+            console.log('Ad SDK initialized');
 
-            videoTag.addEventListener('play', loadAdsSequence);
-        }
-
-        const loadAdsSequence = async (): Promise<void> => {
-            console.log('loadAdsSequence');
-            const container = containerRef.current;
-            const videoTag = videoRef.current;
-
-            if (!container || !videoTag) return;
-
-            videoTag.pause();
-            videoTag.removeEventListener('play', loadAdsSequence);
-
-            let adPosition: string | null = null;
-
+            // Set up event handlers before loading ads
             const onContentPauseRequested = (): void => {
+                console.log('Content pause requested');
                 videoTag.pause();
             }
 
             const onContentResumeRequested = (): void => {
                 console.log('Content resume requested');
-                if (adSDK.getAdDetails().position !== 'postroll') {
-                    videoTag.play();
+                const adDetails = adSDK.getAdDetails();
+                if (adDetails && adDetails.position !== 'postroll') {
+                    videoTag.play().catch((error) => {
+                        console.error('Error playing video after ad:', error);
+                    });
                 }
             }
 
@@ -117,7 +110,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd }) => {
             }
 
             const onAdStart = (): void => {
-                adPosition = adSDK.getAdDetails().position;
+                const adDetails = adSDK.getAdDetails();
+                adPosition = adDetails ? adDetails.position : null;
                 console.log(`Ad Started at position: ${adPosition}`);
             }
 
@@ -141,9 +135,19 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd }) => {
                 console.log('Ad break started');
             }
 
+            const onAdError = (code?: number, message?: string): void => {
+                console.error('Ad error:', code, message);
+                // If ad fails, allow content to play
+                if (!adsLoadedRef.current) {
+                    adsLoadedRef.current = true;
+                    videoTag.play().catch((error) => {
+                        console.error('Error playing video after ad error:', error);
+                    });
+                }
+            }
+
             adSDK.on(adSDK.Events.CONTENT_PAUSE_REQUESTED, onContentPauseRequested);
             adSDK.on(adSDK.Events.CONTENT_RESUME_REQUESTED, onContentResumeRequested);
-
             adSDK.on(adSDK.Events.AD_LOAD, onAdLoad);
             adSDK.on(adSDK.Events.AD_START, onAdStart);
             adSDK.on(adSDK.Events.AD_END, onAdEnd);
@@ -151,12 +155,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd }) => {
             adSDK.on(adSDK.Events.AD_BREAK_START, onAdBreakStart);
             adSDK.on(adSDK.Events.AD_PLAY, onAdPlay);
             adSDK.on(adSDK.Events.AD_PAUSE, onAdPause);
+            adSDK.on(adSDK.Events.AD_ERROR, onAdError);
 
-            const consent:ConsentObject = await getConsentFromTcfApi();
+            // Get consent
+            const consent: ConsentObject = await getConsentFromTcfApi();
+
+            // Prepare app state
             const appState: AppState = {
                 consent: consent,
                 video: {
-                    id: 'x123',
+                    id: 'x8iio7y',
                     isAutoplay: false,
                     type: 'STREAM',
                     isCurrentTimeDVR: false,
@@ -166,6 +174,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd }) => {
                     publisherId: '',
                     publisherType: 'player',
                     publisherReference: 'x1alda',
+                    streamTech: 'hls.js',
+                    ownerId: '',
+                    createdTime: Date.now(),
+                    mimeType: 'application/x-mpegURL',
                 },
                 environment: {
                     appName: '',
@@ -177,20 +189,30 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd }) => {
                     trafficSegment: 0,
                     v1st: '',
                     is3rdPartyCookiesAvailable: false,
+                    osFamily: '',
+                    osName: '',
+                    uaFamily: '',
+                    uaName: '',
+                    uaVersion: '',
                 },
                 player: {
                     videoTag: videoTag,
                     isPlayerControlsEnabled: false,
-                    playedVideosCounter: 0,
                 },
             }
 
             const developmentOptions: DevelopmentOptions = useFakeAd ? {
-                useFakeAd
-            } : {}
+                useFakeAd,
+                vmapUrl: ''
+            } : {
+                useFakeAd: false,
+                vmapUrl: 'https://adtester.dailymotion.com/vmap/x8iio7y'
+            }
 
+            // Load ads sequence - this will trigger preroll ad automatically if available
             await adSDK.loadAdsSequence(appState, developmentOptions);
-            console.log('Ad SDK initialized');
+            adsLoadedRef.current = true;
+            console.log('Ads sequence loaded');
         }
 
         const video = videoRef.current;
@@ -199,12 +221,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd }) => {
         if (Hls.isSupported()) {
             const hls = new Hls();
             hls.loadSource(src);
-            initAdSdk();
             hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                video.play().catch((error) => {
-                    console.error('Error playing video:', error);
-                });
+
+            hls.on(Hls.Events.MANIFEST_PARSED, async () => {
+                console.log('HLS manifest parsed');
+                // Initialize ad SDK and load ads before playing
+                await initializeAndLoadAds();
             });
         }
         // For browsers that natively support HLS (like Safari)
