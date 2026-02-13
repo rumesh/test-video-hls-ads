@@ -6,6 +6,7 @@ import type { AppState, DevelopmentOptions } from '@dailymotion/ad-sdk-web';
 interface VideoPlayerProps {
     src: string;
     useFakeAd: boolean;
+    autoplay?: boolean;
 }
 
 type ConsentObject = {
@@ -66,12 +67,13 @@ function getConsentFromTcfApi(): Promise<ConsentObject> {
     });
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd }) => {
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = false }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const adSdkInitializedRef = useRef(false);
     const adsLoadedRef = useRef(false);
     const adSDKRef = useRef(new AdSdkWeb());
+    const userInteractedRef = useRef(false);
 
     useEffect(() => {
         const adSDK = adSDKRef.current;
@@ -140,9 +142,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd }) => {
                 // If ad fails, allow content to play
                 if (!adsLoadedRef.current) {
                     adsLoadedRef.current = true;
-                    videoTag.play().catch((error) => {
-                        console.error('Error playing video after ad error:', error);
-                    });
+                    if (autoplay && userInteractedRef.current) {
+                        videoTag.play().catch((error) => {
+                            console.error('Error playing video after ad error:', error);
+                        });
+                    }
                 }
             }
 
@@ -165,7 +169,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd }) => {
                 consent: consent,
                 video: {
                     id: 'x8iio7y',
-                    isAutoplay: false,
+                    isAutoplay: autoplay,
                     type: 'STREAM',
                     isCurrentTimeDVR: false,
                     isSeekable: false,
@@ -213,10 +217,43 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd }) => {
             await adSDK.loadAdsSequence(appState, developmentOptions);
             adsLoadedRef.current = true;
             console.log('Ads sequence loaded');
+
+            // If autoplay is enabled and we have user interaction, try to play
+            if (autoplay && userInteractedRef.current) {
+                // The ad SDK will handle playing the preroll ad if available
+                // If no preroll, we need to manually start the content
+                const currentAdDetails = adSDK.getAdDetails();
+                const hasPreroll = currentAdDetails && currentAdDetails.position === 'preroll';
+                if (!hasPreroll) {
+                    videoTag.play().catch((error) => {
+                        console.error('Autoplay blocked:', error);
+                    });
+                }
+            }
+        }
+
+        const handleUserInteraction = async () => {
+            if (userInteractedRef.current) return;
+
+            userInteractedRef.current = true;
+            console.log('User interaction detected');
+
+            // Initialize and load ads on first user interaction
+            await initializeAndLoadAds();
         }
 
         const video = videoRef.current;
         if (!video) return;
+
+        // Add user interaction listeners
+        const interactionEvents = ['click', 'touchstart', 'keydown'];
+        const container = containerRef.current;
+
+        if (container) {
+            interactionEvents.forEach(event => {
+                container.addEventListener(event, handleUserInteraction, { once: true });
+            });
+        }
 
         if (Hls.isSupported()) {
             const hls = new Hls();
@@ -225,20 +262,31 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd }) => {
 
             hls.on(Hls.Events.MANIFEST_PARSED, async () => {
                 console.log('HLS manifest parsed');
-                // Initialize ad SDK and load ads before playing
-                await initializeAndLoadAds();
+
+                // If autoplay is requested, try to autoplay muted
+                if (autoplay) {
+                    // Mute the video to allow autoplay in most browsers
+                    video.muted = true;
+                    userInteractedRef.current = true;
+
+                    try {
+                        await initializeAndLoadAds();
+                    } catch (error) {
+                        console.error('Error during autoplay initialization:', error);
+                    }
+                }
             });
         }
-        // For browsers that natively support HLS (like Safari)
-        // else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        //     video.src = src;
-        //     video.addEventListener('loadedmetadata', () => {
-        //         video.play().catch((error) => {
-        //             console.error('Error playing video:', error);
-        //         });
-        //     });
-        // }
-    }, [src, useFakeAd]);
+
+        // Cleanup
+        return () => {
+            if (container) {
+                interactionEvents.forEach(event => {
+                    container.removeEventListener(event, handleUserInteraction);
+                });
+            }
+        };
+    }, [src, useFakeAd, autoplay]);
 
   return (
     <div
