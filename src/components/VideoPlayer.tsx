@@ -237,15 +237,32 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
 
             userInteractedRef.current = true;
             console.log('User interaction detected');
+        }
 
-            // Initialize and load ads on first user interaction
+        const handleVideoPlay = async (event: Event) => {
+            const video = videoRef.current;
+            if (!video || adsLoadedRef.current) return;
+
+            // Pause the video immediately to load ads first
+            video.pause();
+            event.preventDefault();
+
+            console.log('Video play triggered - loading ads');
+
+            // Mark that user has interacted
+            userInteractedRef.current = true;
+
+            // Initialize and load ads before playing
             await initializeAndLoadAds();
         }
 
         const video = videoRef.current;
         if (!video) return;
 
-        // Add user interaction listeners
+        // Listen for play event on the video element to trigger ads
+        video.addEventListener('play', handleVideoPlay);
+
+        // Track user interaction for autoplay policy
         const interactionEvents = ['click', 'touchstart', 'keydown'];
         const container = containerRef.current;
 
@@ -263,7 +280,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
             hls.on(Hls.Events.MANIFEST_PARSED, async () => {
                 console.log('HLS manifest parsed');
 
-                // If autoplay is requested, try to autoplay muted
+                // If autoplay is requested, initialize immediately and autoplay muted
                 if (autoplay) {
                     // Mute the video to allow autoplay in most browsers
                     video.muted = true;
@@ -275,11 +292,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
                         console.error('Error during autoplay initialization:', error);
                     }
                 }
+                // For non-autoplay, ads will be loaded when user clicks play
             });
         }
 
         // Cleanup
         return () => {
+            video.removeEventListener('play', handleVideoPlay);
+
             if (container) {
                 interactionEvents.forEach(event => {
                     container.removeEventListener(event, handleUserInteraction);
