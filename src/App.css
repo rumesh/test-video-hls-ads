@@ -233,6 +233,54 @@ h1 {
   aspect-ratio: 16 / 9;
 }
 
+.close-sticky-button {
+  position: fixed;
+  bottom: calc(30em * 9 / 16); /* Exact top edge of player */
+  right: 20px; /* Aligned with right edge of player */
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1002;
+  transition: all 0.2s ease;
+  padding: 0;
+  backdrop-filter: blur(8px);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  transform: translateY(-50%); /* Move up by half its height to sit on top edge */
+}
+
+.close-sticky-button:hover {
+  background: rgba(255, 0, 0, 0.9);
+  border-color: rgba(255, 0, 0, 0.4);
+  transform: translateY(-50%) scale(1.15);
+}
+
+.close-sticky-button:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.close-sticky-button:focus {
+  outline: 2px solid #646cff;
+  outline-offset: 2px;
+}
+
+/* Responsive close button */
+@media (max-width: 768px) {
+  .close-sticky-button {
+    bottom: calc(90vw * 9 / 16); /* Top edge of mobile player */
+    right: calc(5vw + 90vw - 36px); /* Right side of mobile player */
+    transform: translateY(-50%);
+  }
+}
+
 .content-section {
   max-width: 800px;
   margin: 0 auto;

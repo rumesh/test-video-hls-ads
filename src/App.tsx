@@ -22,6 +22,7 @@ function App() {
   });
 
   const [isSticky, setIsSticky] = useState(false);
+  const [isStickyVisible, setIsStickyVisible] = useState(true);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const [playerHeight, setPlayerHeight] = useState(0);
 
@@ -54,6 +55,7 @@ function App() {
       if (playerTop <= 0 && !isSticky) {
         setPlayerHeight(rect.height);
         setIsSticky(true);
+        setIsStickyVisible(true); // Reset visibility when becoming sticky
       } else if (playerTop > 0 && isSticky) {
         setIsSticky(false);
       }
@@ -62,6 +64,10 @@ function App() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, [isSticky]);
+
+  const handleCloseStickyPlayer = () => {
+    setIsStickyVisible(false);
+  };
 
   const handleToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.checked;
@@ -141,7 +147,17 @@ function App() {
         className={`player-wrapper ${isSticky ? 'sticky' : ''}`}
         style={isSticky ? { height: `${playerHeight}px` } : undefined}
       >
-        <div className={isSticky ? 'player-content-sticky' : ''}>
+        {isSticky && isStickyVisible && (
+          <button
+            className="close-sticky-button"
+            onClick={handleCloseStickyPlayer}
+            aria-label="Close sticky player"
+            title="Close sticky player"
+          >
+            ✕
+          </button>
+        )}
+        <div className={isSticky && isStickyVisible ? 'player-content-sticky' : ''}>
           <VideoPlayer
             src={hlsStreamUrl}
             useFakeAd={useFakeAd}
