@@ -191,3 +191,109 @@ h1 {
 .videoPlayer {
   max-width: 50vw;
 }
+
+.player-wrapper {
+  margin: 2rem auto;
+  max-width: 800px;
+  transition: all 0.3s ease-in-out;
+  position: relative;
+}
+
+.player-wrapper.sticky {
+  /* Keep the placeholder in document flow */
+  position: relative;
+}
+
+.player-content-sticky {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  max-width: 40em;
+  width: 40em;
+  z-index: 1000;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+  animation: slideIn 0.3s ease-out;
+  background: #000;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.player-content-sticky .videoPlayerContainer {
+  aspect-ratio: 16 / 9;
+}
+
+.content-section {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: left;
+  line-height: 1.8;
+}
+
+.content-section h2 {
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  color: #ffffff;
+}
+
+.content-section h3 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  color: #ffffff;
+}
+
+@media (prefers-color-scheme: light) {
+  .content-section h2,
+  .content-section h3 {
+    color: #1a1a1a;
+  }
+}
+
+.content-section p {
+  margin-bottom: 1rem;
+  color: rgba(255, 255, 255, 0.87);
+}
+
+@media (prefers-color-scheme: light) {
+  .content-section p {
+    color: #213547;
+  }
+}
+
+.content-section ul {
+  margin-left: 2rem;
+  margin-bottom: 1rem;
+}
+
+.content-section li {
+  margin-bottom: 0.5rem;
+  color: rgba(255, 255, 255, 0.87);
+}
+
+@media (prefers-color-scheme: light) {
+  .content-section li {
+    color: #213547;
+  }
+}
+
+/* Responsive sticky player */
+@media (max-width: 768px) {
+  .player-content-sticky {
+    max-width: 90vw;
+    width: 90vw;
+    bottom: 10px;
+    right: 5vw;
+    left: 5vw;
+  }
+}
