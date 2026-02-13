@@ -7,6 +7,8 @@ interface VideoPlayerProps {
     src: string;
     useFakeAd: boolean;
     autoplay?: boolean;
+    customVmapUrl?: string; // Optional custom VMAP URL for testing
+    xid?: string; // Dailymotion video ID (e.g., 'x8iio7y')
 }
 
 type ConsentObject = {
@@ -67,13 +69,14 @@ function getConsentFromTcfApi(): Promise<ConsentObject> {
     });
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = false }) => {
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = false, customVmapUrl, xid = 'x8iio7y' }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const adSdkInitializedRef = useRef(false);
     const adsLoadedRef = useRef(false);
     const adSDKRef = useRef(new AdSdkWeb());
     const userInteractedRef = useRef(false);
+    const isAdPlayingRef = useRef(false); // Track if ad is currently playing
 
     useEffect(() => {
         const adSDK = adSDKRef.current;
@@ -94,11 +97,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
             // Set up event handlers before loading ads
             const onContentPauseRequested = (): void => {
                 console.log('Content pause requested');
+                isAdPlayingRef.current = true;
                 videoTag.pause();
             }
 
             const onContentResumeRequested = (): void => {
                 console.log('Content resume requested');
+                isAdPlayingRef.current = false;
                 const adDetails = adSDK.getAdDetails();
                 if (adDetails && adDetails.position !== 'postroll') {
                     videoTag.play().catch((error) => {
@@ -114,11 +119,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
             const onAdStart = (): void => {
                 const adDetails = adSDK.getAdDetails();
                 adPosition = adDetails ? adDetails.position : null;
+                isAdPlayingRef.current = true;
                 console.log(`Ad Started at position: ${adPosition}`);
             }
 
             const onAdEnd = (): void => {
                 console.log('Ad ended');
+                isAdPlayingRef.current = false;
             }
 
             const onAdPlay = (): void => {
@@ -131,14 +138,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
 
             const onAdBreakEnd = (): void => {
                 console.log('Ad break ended');
+                isAdPlayingRef.current = false;
             }
 
             const onAdBreakStart = (): void => {
                 console.log('Ad break started');
+                isAdPlayingRef.current = true;
             }
 
             const onAdError = (code?: number, message?: string): void => {
                 console.error('Ad error:', code, message);
+                isAdPlayingRef.current = false;
                 // If ad fails, allow content to play
                 if (!adsLoadedRef.current) {
                     adsLoadedRef.current = true;
@@ -168,7 +178,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
             const appState: AppState = {
                 consent: consent,
                 video: {
-                    id: 'x8iio7y',
+                    id: xid,
                     isAutoplay: autoplay,
                     type: 'STREAM',
                     isCurrentTimeDVR: false,
@@ -206,11 +216,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
             }
 
             const developmentOptions: DevelopmentOptions = useFakeAd ? {
-                useFakeAd,
+                useFakeAd: true,
                 vmapUrl: ''
+            } : customVmapUrl ? {
+                useFakeAd: false,
+                vmapUrl: customVmapUrl
             } : {
                 useFakeAd: false,
-                vmapUrl: 'https://adtester.dailymotion.com/vmap/x8iio7y'
+                vmapUrl: ''
             }
 
             // Load ads sequence - this will trigger preroll ad automatically if available
@@ -241,19 +254,42 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
 
         const handleVideoPlay = async (event: Event) => {
             const video = videoRef.current;
-            if (!video || adsLoadedRef.current) return;
+            if (!video) return;
 
-            // Pause the video immediately to load ads first
-            video.pause();
-            event.preventDefault();
+            // If ads are currently playing, prevent content from starting
+            if (isAdPlayingRef.current) {
+                console.log('Preventing video play - ad is currently playing');
+                video.pause();
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
 
-            console.log('Video play triggered - loading ads');
+            // If ads haven't been loaded yet, load them first
+            if (!adsLoadedRef.current) {
+                // Pause the video immediately to load ads first
+                video.pause();
+                event.preventDefault();
 
-            // Mark that user has interacted
-            userInteractedRef.current = true;
+                console.log('Video play triggered - loading ads');
 
-            // Initialize and load ads before playing
-            await initializeAndLoadAds();
+                // Mark that user has interacted
+                userInteractedRef.current = true;
+
+                // Initialize and load ads before playing
+                await initializeAndLoadAds();
+            }
+        }
+
+        const handleVideoPlaying = () => {
+            const video = videoRef.current;
+            if (!video) return;
+
+            // If an ad is playing, pause the content video immediately
+            if (isAdPlayingRef.current) {
+                console.log('Pausing content - ad is playing');
+                video.pause();
+            }
         }
 
         const video = videoRef.current;
@@ -261,6 +297,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
 
         // Listen for play event on the video element to trigger ads
         video.addEventListener('play', handleVideoPlay);
+        // Listen for playing event to catch when video actually starts playing
+        video.addEventListener('playing', handleVideoPlaying);
 
         // Track user interaction for autoplay policy
         const interactionEvents = ['click', 'touchstart', 'keydown'];
@@ -299,6 +337,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
         // Cleanup
         return () => {
             video.removeEventListener('play', handleVideoPlay);
+            video.removeEventListener('playing', handleVideoPlaying);
 
             if (container) {
                 interactionEvents.forEach(event => {
@@ -306,7 +345,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
                 });
             }
         };
-    }, [src, useFakeAd, autoplay]);
+    }, [src, useFakeAd, autoplay, customVmapUrl, xid]);
 
   return (
     <div

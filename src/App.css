@@ -38,7 +38,14 @@
 }
 
 .read-the-docs {
-  color: #888;
+  color: #666;
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  .read-the-docs {
+    color: #aaa;
+  }
 }
 
 .app {
@@ -50,11 +57,35 @@
 
 h1 {
   margin-bottom: 2rem;
-  color: #333;
+  color: #ffffff;
+}
+
+/* Override h1 color for light mode */
+@media (prefers-color-scheme: light) {
+  h1 {
+    color: #1a1a1a;
+  }
 }
 
 .controls {
   margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+  padding: 1.5rem;
+  background: #f5f5f5;
+  border-radius: 8px;
+  max-width: 600px;
+  margin: 0 auto 2rem;
+}
+
+/* Dark mode styles for controls */
+@media (prefers-color-scheme: dark) {
+  .controls {
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
+  }
 }
 
 .controls label {
@@ -62,12 +93,92 @@ h1 {
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
+  font-weight: 500;
+  color: #1a1a1a;
+}
+
+/* Dark mode label color */
+@media (prefers-color-scheme: dark) {
+  .controls label {
+    color: #ffffff;
+  }
 }
 
 .controls input[type="checkbox"] {
   width: 1.2rem;
   height: 1.2rem;
   cursor: pointer;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.input-group label {
+  text-align: left;
+  font-size: 0.9rem;
+  color: #2a2a2a;
+  font-weight: 500;
+}
+
+/* Dark mode input label */
+@media (prefers-color-scheme: dark) {
+  .input-group label {
+    color: #e8e8e8;
+  }
+}
+
+.input-group input[type="text"] {
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  transition: border-color 0.3s;
+  background-color: #ffffff;
+  color: #1a1a1a;
+}
+
+/* Dark mode input fields */
+@media (prefers-color-scheme: dark) {
+  .input-group input[type="text"] {
+    background-color: #1a1a1a;
+    color: #ffffff;
+    border-color: #3a3a3a;
+  }
+
+  .input-group input[type="text"]::placeholder {
+    color: #888;
+  }
+}
+
+.input-group input[type="text"]:focus {
+  outline: none;
+  border-color: #646cff;
+  box-shadow: 0 0 0 3px rgba(100, 108, 255, 0.1);
+}
+
+.apply-button {
+  margin-top: 0.5rem;
+  padding: 0.75rem 2rem;
+  background-color: #646cff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.apply-button:hover {
+  background-color: #535bf2;
+}
+
+.apply-button:active {
+  transform: translateY(1px);
 }
 
 .videoPlayerContainer {
