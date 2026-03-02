@@ -28,6 +28,42 @@ function generateViewId(): string {
     return `${Date.now().toString(32)}${randomValue}`;
 }
 
+function generateDeviceId(): string {
+    const storedId = localStorage.getItem('dm_device_id');
+    if (storedId) return storedId;
+
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    const newId = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+    localStorage.setItem('dm_device_id', newId);
+    return newId;
+}
+
+function getTopDomain(): string {
+    try {
+        const hostname = window.location.hostname;
+        const parts = hostname.split('.');
+        if (parts.length >= 2) {
+            return parts.slice(-2).join('.');
+        }
+        return hostname;
+    } catch {
+        return 'localhost';
+    }
+}
+
+function getLocale(): string {
+    return navigator.language || 'en-US';
+}
+
+function getClientType(): string {
+    const ua = navigator.userAgent.toLowerCase();
+    if (/mobile|android|iphone|ipad|ipod/.test(ua)) {
+        return 'mobile_web';
+    }
+    return 'web';
+}
+
 const defaultConsent: ConsentObject = {
     tcfConsent: '',
     tcf2HasConsentForGoogle: false,
@@ -201,20 +237,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
                     mimeType: 'application/x-mpegURL',
                 },
                 environment: {
-                    appName: '',
-                    locale: '',
-                    topDomain: '',
-                    embedder: '',
-                    clientType: '',
-                    deviceId: '',
-                    trafficSegment: 0,
-                    v1st: '',
+                    appName: 'video-hls-player',
+                    locale: getLocale(),
+                    topDomain: getTopDomain(),
+                    embedder: window.location.hostname,
+                    clientType: getClientType(),
+                    deviceId: generateDeviceId(),
+                    trafficSegment: Math.floor(Math.random() * 100),
+                    v1st: generateDeviceId(),
                     is3rdPartyCookiesAvailable: false,
-                    osFamily: '',
-                    osName: '',
-                    uaFamily: '',
-                    uaName: '',
-                    uaVersion: '',
                 },
                 player: {
                     videoTag: videoTag,
