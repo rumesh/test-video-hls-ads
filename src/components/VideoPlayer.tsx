@@ -21,6 +21,13 @@ type ConsentObject = {
 const DAILYMOTION_VENDOR_ID = 573;
 const GOOGLE_VENDOR_ID = 755;
 
+function generateViewId(): string {
+    const bytes = new Uint8Array(5);
+    crypto.getRandomValues(bytes);
+    const randomValue = Array.from(bytes, (byte) => byte.toString(16)).join('').padStart(10, '0');
+    return `${Date.now().toString(32)}${randomValue}`;
+}
+
 const defaultConsent: ConsentObject = {
     tcfConsent: '',
     tcf2HasConsentForGoogle: false,
@@ -183,7 +190,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
                     type: 'STREAM',
                     isCurrentTimeDVR: false,
                     isSeekable: false,
-                    viewId: '',
+                    viewId: generateViewId(),
                     duration: 62,
                     publisherId: '',
                     publisherType: 'player',
