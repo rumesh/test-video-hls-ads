@@ -101,7 +101,7 @@ function App() {
   return (
     <div className="app">
       <h1>HLS Video Player Demo</h1>
-      <div className="controls">
+      <div className="page-controls">
         <label>
           <input
             type="checkbox"

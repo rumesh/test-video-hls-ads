@@ -67,7 +67,7 @@ h1 {
   }
 }
 
-.controls {
+.page-controls {
   margin-bottom: 1rem;
   display: flex;
   flex-direction: column;
@@ -82,13 +82,13 @@ h1 {
 
 /* Dark mode styles for controls */
 @media (prefers-color-scheme: dark) {
-  .controls {
+  .page-controls {
     background: #2a2a2a;
     border: 1px solid #3a3a3a;
   }
 }
 
-.controls label {
+.page-controls label {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -99,12 +99,12 @@ h1 {
 
 /* Dark mode label color */
 @media (prefers-color-scheme: dark) {
-  .controls label {
+  .page-controls label {
     color: #ffffff;
   }
 }
 
-.controls input[type="checkbox"] {
+.page-controls input[type="checkbox"] {
   width: 1.2rem;
   height: 1.2rem;
   cursor: pointer;
