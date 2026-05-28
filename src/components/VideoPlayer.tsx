@@ -1,7 +1,13 @@
 import { useEffect, useRef } from 'react';
 import Hls from 'hls.js';
 import { AdSdkWeb } from '@dailymotion/ad-sdk-web';
-import type { AppState, DevelopmentOptions } from '@dailymotion/ad-sdk-web';
+import type {
+    AppState,
+    DevelopmentOptions,
+    AdStartPayload,
+    AdReadyToFetchPayload,
+    AdDebugLogPayload,
+} from '@dailymotion/ad-sdk-web';
 
 interface VideoPlayerProps {
     src: string;
@@ -123,7 +129,84 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
 
     useEffect(() => {
         const adSDK = adSDKRef.current;
+        const isDev = import.meta.env.DEV;
         let adPosition: string | null = null;
+
+        const videoTagAtMount = videoRef.current;
+
+        const onContentPauseRequested = (): void => {
+            console.log('Content pause requested');
+            isAdPlayingRef.current = true;
+            videoTagAtMount?.pause();
+        }
+
+        const onContentResumeRequested = (): void => {
+            console.log('Content resume requested');
+            isAdPlayingRef.current = false;
+            const adDetails = adSDK.getAdDetails();
+            if (adDetails && adDetails.position !== 'postroll') {
+                videoTagAtMount?.play().catch((error) => {
+                    console.error('Error playing video after ad:', error);
+                });
+            }
+        }
+
+        const onAdLoad = (): void => {
+            console.log('Ad loaded');
+        }
+
+        const onAdStart = (payload: AdStartPayload): void => {
+            adPosition = payload.position;
+            isAdPlayingRef.current = true;
+            console.log(`Ad Started at position: ${adPosition}`, {
+                companionAds: payload.companionAds,
+            });
+        }
+
+        const onAdEnd = (): void => {
+            console.log('Ad ended');
+            isAdPlayingRef.current = false;
+        }
+
+        const onAdPlay = (): void => {
+            console.log('Ad is playing');
+        }
+
+        const onAdPause = (): void => {
+            console.log('Ad is paused');
+        }
+
+        const onAdBreakEnd = (): void => {
+            console.log('Ad break ended');
+            isAdPlayingRef.current = false;
+        }
+
+        const onAdBreakStart = (): void => {
+            console.log('Ad break started');
+            isAdPlayingRef.current = true;
+        }
+
+        const onAdError = (code?: number, message?: string): void => {
+            console.error('Ad error:', code, message);
+            isAdPlayingRef.current = false;
+            // If ad fails, allow content to play
+            if (!adsLoadedRef.current) {
+                adsLoadedRef.current = true;
+                if (autoplay && userInteractedRef.current) {
+                    videoTagAtMount?.play().catch((error) => {
+                        console.error('Error playing video after ad error:', error);
+                    });
+                }
+            }
+        }
+
+        const onAdReadyToFetch = (payload: AdReadyToFetchPayload): void => {
+            console.log(`Ad ready to fetch at position: ${payload.position}`);
+        }
+
+        const onAdDebugLog = (payload: AdDebugLogPayload): void => {
+            console.debug('[AdSDK]', payload.message, payload.args);
+        }
 
         const initializeAndLoadAds = async (): Promise<void> => {
             const container = containerRef.current;
@@ -133,75 +216,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
 
             adSdkInitializedRef.current = true;
 
-            // Initialize the ad SDK
             await adSDK.initialize(container);
             console.log('Ad SDK initialized');
-
-            // Set up event handlers before loading ads
-            const onContentPauseRequested = (): void => {
-                console.log('Content pause requested');
-                isAdPlayingRef.current = true;
-                videoTag.pause();
-            }
-
-            const onContentResumeRequested = (): void => {
-                console.log('Content resume requested');
-                isAdPlayingRef.current = false;
-                const adDetails = adSDK.getAdDetails();
-                if (adDetails && adDetails.position !== 'postroll') {
-                    videoTag.play().catch((error) => {
-                        console.error('Error playing video after ad:', error);
-                    });
-                }
-            }
-
-            const onAdLoad = () => {
-                console.log('Ad loaded');
-            }
-
-            const onAdStart = (): void => {
-                const adDetails = adSDK.getAdDetails();
-                adPosition = adDetails ? adDetails.position : null;
-                isAdPlayingRef.current = true;
-                console.log(`Ad Started at position: ${adPosition}`);
-            }
-
-            const onAdEnd = (): void => {
-                console.log('Ad ended');
-                isAdPlayingRef.current = false;
-            }
-
-            const onAdPlay = (): void => {
-                console.log('Ad is playing');
-            }
-
-            const onAdPause = (): void => {
-                console.log('Ad is paused');
-            }
-
-            const onAdBreakEnd = (): void => {
-                console.log('Ad break ended');
-                isAdPlayingRef.current = false;
-            }
-
-            const onAdBreakStart = (): void => {
-                console.log('Ad break started');
-                isAdPlayingRef.current = true;
-            }
-
-            const onAdError = (code?: number, message?: string): void => {
-                console.error('Ad error:', code, message);
-                isAdPlayingRef.current = false;
-                // If ad fails, allow content to play
-                if (!adsLoadedRef.current) {
-                    adsLoadedRef.current = true;
-                    if (autoplay && userInteractedRef.current) {
-                        videoTag.play().catch((error) => {
-                            console.error('Error playing video after ad error:', error);
-                        });
-                    }
-                }
-            }
 
             adSDK.on(adSDK.Events.CONTENT_PAUSE_REQUESTED, onContentPauseRequested);
             adSDK.on(adSDK.Events.CONTENT_RESUME_REQUESTED, onContentResumeRequested);
@@ -213,6 +229,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
             adSDK.on(adSDK.Events.AD_PLAY, onAdPlay);
             adSDK.on(adSDK.Events.AD_PAUSE, onAdPause);
             adSDK.on(adSDK.Events.AD_ERROR, onAdError);
+            adSDK.on(adSDK.Events.AD_READY_TO_FETCH, onAdReadyToFetch);
+            if (isDev) {
+                adSDK.on(adSDK.Events.AD_DEBUG_LOG, onAdDebugLog);
+            }
 
             // Get consent
             const consent: ConsentObject = await getConsentFromTcfApi();
@@ -253,15 +273,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
                 },
             }
 
-            const developmentOptions: DevelopmentOptions = useFakeAd ? {
-                useFakeAd: true,
-                vmapUrl: ''
-            } : customVmapUrl ? {
-                useFakeAd: false,
-                vmapUrl: customVmapUrl
-            } : {
-                useFakeAd: false,
-                vmapUrl: ''
+            const developmentOptions: DevelopmentOptions = {
+                useFakeAd,
+                vmapUrl: !useFakeAd && customVmapUrl ? customVmapUrl : '',
+                ...(isDev ? { enableDebugAdLog: true } : {}),
             }
 
             // Load ads sequence - this will trigger preroll ad automatically if available
@@ -372,7 +387,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
             });
         }
 
-        // Cleanup
         return () => {
             video.removeEventListener('play', handleVideoPlay);
             video.removeEventListener('playing', handleVideoPlaying);
@@ -381,6 +395,30 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, useFakeAd, autoplay = fa
                 interactionEvents.forEach(event => {
                     container.removeEventListener(event, handleUserInteraction);
                 });
+            }
+
+            if (adSdkInitializedRef.current) {
+                try {
+                    adSDK.off(adSDK.Events.CONTENT_PAUSE_REQUESTED, onContentPauseRequested);
+                    adSDK.off(adSDK.Events.CONTENT_RESUME_REQUESTED, onContentResumeRequested);
+                    adSDK.off(adSDK.Events.AD_LOAD, onAdLoad);
+                    adSDK.off(adSDK.Events.AD_START, onAdStart);
+                    adSDK.off(adSDK.Events.AD_END, onAdEnd);
+                    adSDK.off(adSDK.Events.AD_BREAK_END, onAdBreakEnd);
+                    adSDK.off(adSDK.Events.AD_BREAK_START, onAdBreakStart);
+                    adSDK.off(adSDK.Events.AD_PLAY, onAdPlay);
+                    adSDK.off(adSDK.Events.AD_PAUSE, onAdPause);
+                    adSDK.off(adSDK.Events.AD_ERROR, onAdError);
+                    adSDK.off(adSDK.Events.AD_READY_TO_FETCH, onAdReadyToFetch);
+                    if (isDev) {
+                        adSDK.off(adSDK.Events.AD_DEBUG_LOG, onAdDebugLog);
+                    }
+                    adSDK.reset();
+                } catch (error) {
+                    console.warn('Error during Ad SDK cleanup:', error);
+                }
+                adSdkInitializedRef.current = false;
+                adsLoadedRef.current = false;
             }
         };
     }, [src, useFakeAd, autoplay, customVmapUrl, xid]);
